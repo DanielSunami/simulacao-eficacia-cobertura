@@ -22,8 +22,45 @@
 								<h4 class="card-title">Eficácia (%)</h4>
 								<p class="card-description"></p>
 								<div class="col col-12">
-									<vue-slider class="pt-3" :marks="[0, 100]" v-model="form.eficacia" :min="0" :max="100"/>
+									<vue-slider class="pt-3" :marks="[0, 50, 70, 90, 100]" v-model="form.eficacia" :min="0" :max="100"/>
 								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="row">
+					<div class="col-lg-12 grid-margin stretch-card">
+						<div class="card">
+							<div class="card-body">
+								<h4 class="card-title">Taxa de Transmissão</h4>
+								<p class="card-description"></p>
+								<div class="col col-12">
+									<vue-slider class="pt-3" :marks="[0, 0.5, 1, 1.5, 2]" v-model="form.r" @change="updateChart" :min="0" :max="2" :interval="0.1"/>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="row">
+					<div class="col-lg-12 grid-margin stretch-card">
+						<div class="card">
+							<div class="card-body">
+								<h4 class="card-title">Taxa de Transmissão (%)</h4>
+								<p class="card-description"></p>
+								<form class="forms-sample">
+									<b-form-group label="Número de habitantes"  label-for="input1">
+										<b-form-input type="text" id="input1" class="claro" v-model="form.habitantes" @change="updateChart" placeholder="Exemplo: 46000000"></b-form-input>
+									</b-form-group>
+									<b-form-group label="Total de mortes em dez/20"  label-for="input2">
+										<b-form-input type="text" id="input2" class="claro" v-model="form.mortesDez" @change="updateChart" placeholder="3000"></b-form-input>
+									</b-form-group>
+									<div class="d-flex">
+										{{(( form.mortesDez / form.habitantes) * 100000).toFixed(2)}} mortes por 100mil habitantes em dez/20
+									</div>
+									<div class="d-none">
+									{{baseMortes}}
+									</div>
+								</form>
 							</div>
 						</div>
 					</div>
@@ -89,9 +126,11 @@ export default {
 					{ cobertura: 0, mes: "Mai" },
 					{ cobertura: 0, mes: "Jun" }
 				],
-				eficacia: 50
+				eficacia: 50,
+				r: 1.3,
+				habitantes: 46000000,
+				mortesDez: 3000
 			},
-			baseMortes: [30, 40, 60, 50, 40, 30, 30],
 			options: {
 				scaleOverride: true,
 				scaleStartValue: 0,
@@ -104,6 +143,10 @@ export default {
 								max: 100,
 								min: 0,
 								stepSize: 20
+							},
+							scaleLabel: {
+								display: true,
+								labelString: 'Mortes por 100k/hab'
 							}
 						}
 					]
@@ -115,7 +158,7 @@ export default {
 					{
 						label: 'Mortes',
 						borderColor: '#f87979',
-						data: [30, 40, 60, 50, 40, 30, 30],
+						data: [8.48, 11.02, 14.33, 18.63, 24.22, 31.49, 40.94],
 						fill: false,
 						cubicInterpolationMode: 'monotone'
 					}
@@ -127,18 +170,49 @@ export default {
 		lineChart,
 		VueSlider
 	},
+	computed: {
+		baseMortes() {
+			const self = this;
+			const arr = [];
+			let i = parseFloat((( self.form.mortesDez / self.form.habitantes) * 100000).toFixed(2));
+			for(let m = 0; m < 7; m++) {
+				i = parseFloat((i * self.form.r).toFixed(2));
+				arr.push(i);
+			}
+
+			return arr;
+		}
+	},
 	methods: {
 		addVacina() {
 			let self = this;
 
 			self.datacollection = Object.assign({}, self.datacollection);
 		},
-		calc(val, indexM){
+		calc(val, indexM) {
 			let self = this;
+
+			for(let i = indexM+1; i < self.form.statusPorMes.length; i++) {
+				if(self.form.statusPorMes[i].cobertura < val)
+					self.form.statusPorMes[i].cobertura = val;
+			}
+
+			for(let i = indexM-1; i >= 0; i--) {
+				if(self.form.statusPorMes[i].cobertura > val)
+					self.form.statusPorMes[i].cobertura = val;
+			}
 
 			if(indexM + 1 >= self.datacollection.datasets[0].data.length ) return;
 			for(let i = indexM+1; i < self.datacollection.datasets[0].data.length; i++) {
 				self.datacollection.datasets[0].data[i] = self.baseMortes[i] - (0.1 * val);
+			}
+
+			// atualiza grafico
+			self.datacollection = Object.assign({}, self.datacollection);
+		},
+		updateChart(){
+			for(let i = 0; i < self.datacollection.datasets[0].data.length; i++) {
+				self.datacollection.datasets[0].data[i] = self.baseMortes[i];
 			}
 
 			// atualiza grafico
